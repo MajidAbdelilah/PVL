@@ -18,8 +18,8 @@ public:
     
     // This is the function that will be called from SYCL kernels
     // Remove the virtual keyword to avoid virtual calls in kernels
-    SYCL_EXTERNAL T operator()(T val, size_t idx) const {
-        return val * 2; // Default implementation, doubles the value
+    SYCL_EXTERNAL T operator()(const T val, const size_t idx) const {
+        return -1; // Default implementation, doubles the value
     }
 };
 
@@ -50,7 +50,7 @@ public:
 
     Lp_parallel_vector_GPU(size_t num_elements) : std::vector<T>(num_elements) {
         try {
-            q = sycl::queue(sycl::gpu_selector_v);
+            q = sycl::queue(sycl::cpu_selector_v);
             is_gpu = true;
         } catch (const sycl::exception& e) {
             std::cerr << "GPU not available, falling back to CPU: " << e.what() << std::endl;
@@ -130,7 +130,8 @@ public:
     }
 
     // Modify the fill method to avoid virtual function calls
-    void fill(const SyclFunction<T>& func) {
+    template<class fun>
+    void fill(const fun& func) {
         if (this->empty()) return;
         
         // Create SYCL buffer from the vector data

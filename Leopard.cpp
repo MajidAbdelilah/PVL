@@ -84,37 +84,115 @@ int fun(int val, size_t index)
     (void)index; return val * 2; 
 }
 
+            
+int func(const int val, const size_t idx) {
+    return idx * 2 - val;
+}
+
+class vec2 {
+public:
+    vec2() {}
+    vec2(int x, int y) : x(x), y(y) {}
+    vec2(const vec2& other) : x(other.x), y(other.y) {}
+    vec2& operator=(const vec2& other) {
+        if (this != &other) {
+            x = other.x;
+            y = other.y;
+        }
+        return *this;
+    }
+    vec2 operator+(const vec2& other) const {
+        return vec2(x + other.x, y + other.y);
+    }
+    vec2 operator-(const vec2& other) const {
+        return vec2(x - other.x, y - other.y);
+    }
+    vec2 operator*(const vec2& other) const {
+        return vec2(x * other.x, y * other.y);
+    }
+    vec2 operator/(const vec2& other) const {
+        if (other.x == 0 || other.y == 0) {
+            throw std::runtime_error("Division by zero");
+        }
+        return vec2(x / other.x, y / other.y);
+    }
+    int x;
+    int y;
+};
+
+
 // Define a custom SYCL-compatible function class that inherits from SyclFunction
 // but doesn't override the function virtually
-class DoubleFunction : public SyclFunction<int> {
+
+class DoubleFunction{
 public:
     // Remove 'override' since the base function is no longer virtual
-    SYCL_EXTERNAL int operator()(int val, size_t idx) const {
-        (void)idx; // Unused parameter
-        return val * 2;
+    SYCL_EXTERNAL vec2 operator()(const vec2 val, const size_t idx) const {
+        return vec2(val.x * 2, val.y * 2);
     }
 };
+// Define a custom SYCL-compatible function class that inherits from SyclFunction
+// but doesn't override the function virtually
+class DoubleFunc {
+public:
+    DoubleFunc() {}
+    // Remove 'override' since the base function is no longer virtual
+    SYCL_EXTERNAL int operator()(const int val, const size_t idx) const {
+        return idx * 2 - val;
+    }
+};
+    
+
+class FillFunction{
+public:
+    FillFunction() {}
+    // Remove 'override' since the base function is no longer virtual
+    SYCL_EXTERNAL vec2 operator()(const vec2 val, const size_t idx) const{
+        return vec2(12, 42);
+    }
+};
+
+template<>
+struct sycl::is_device_copyable<vec2> : std::true_type {};
+template<>
+struct sycl::is_device_copyable<DoubleFunction> : std::true_type {};
+template<>
+struct sycl::is_device_copyable<DoubleFunc> : std::true_type {};
+template<>
+struct sycl::is_device_copyable<FillFunction> : std::true_type {};
 
 // Function to test GPU vector functionality
 void test_gpu_vector() {
     std::cout << "\nTesting GPU vector functionality..." << std::endl;
-    sycl::queue q(sycl::gpu_selector_v);
-    if (!q.get_device().is_gpu()) {
+    try
+    {
+        sycl::queue q(sycl::gpu_selector_v);        
+    
+        if (!q.get_device().is_gpu()) {
+            std::cerr << "No GPU device found. Skipping GPU vector tests." << std::endl;
+            return;
+        }
+        std::cout << "GPU device found: " << q.get_device().get_info<sycl::info::device::name>() << std::endl;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "Error: " << e.what() << std::endl;
         std::cerr << "No GPU device found. Skipping GPU vector tests." << std::endl;
         return;
     }
-    std::cout << "GPU device found: " << q.get_device().get_info<sycl::info::device::name>() << std::endl;
+    
     std::cout << "GPU version of Lp_parallel_vector is being tested..." << std::endl;
 
     // Test basic constructor and destructor
     std::cout << "Testing basic constructor and destructor..." << std::endl;
-    Lp_parallel_vector_GPU<int> vec_gpu(100000);
+    Lp_parallel_vector_GPU<vec2> vec_gpu(100000);
     
     // Test fill method
     std::cout << "Testing fill method..." << std::endl;
-    vec_gpu.fill(42);
-    std::cout << "First element: " << vec_gpu[0] << std::endl;
-    std::cout << "Last element: " << vec_gpu[vec_gpu.size()-1] << std::endl;
+    FillFunction fill;
+    vec_gpu.fill(fill);
+    std::cout << "First element: " << vec_gpu[0].x << " " << vec_gpu[0].y << std::endl;
+    std::cout << "Last element: " << vec_gpu[vec_gpu.size()-1].x << " " << vec_gpu[vec_gpu.size()-1].y << std::endl;
     
     // Test fill with function
     std::cout << "Testing fill with function..." << std::endl;
@@ -123,8 +201,8 @@ void test_gpu_vector() {
     DoubleFunction doubleFunc;
     vec_gpu.fill(doubleFunc);
     
-    std::cout << "First element after function: " << vec_gpu[0] << std::endl;
-    std::cout << "Last element after function: " << vec_gpu[vec_gpu.size()-1] << std::endl;
+    std::cout << "First element after function: " << vec_gpu[0].x << " " << vec_gpu[0].y << std::endl;
+    std::cout << "Last element after function: " << vec_gpu[vec_gpu.size()-1].x << " " << vec_gpu[vec_gpu.size()-1].y << std::endl;
     
     // Test arithmetic operations
     std::cout << "Testing arithmetic operations..." << std::endl;
@@ -178,14 +256,15 @@ void test_gpu_vector() {
     // GPU Version
     Lp_parallel_vector_GPU<int> large_vec_gpu(size);
     auto start_gpu = std::chrono::high_resolution_clock::now();
-    large_vec_gpu.fill(42);
+    DoubleFunc doubleFunc2;
+    large_vec_gpu.fill(doubleFunc2);
     auto end_gpu = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_gpu = end_gpu - start_gpu;
     
     // CPU Version
     Lp_parallel_vector<int> large_vec_cpu(size);
     auto start_cpu = std::chrono::high_resolution_clock::now();
-    large_vec_cpu.fill(42);
+    large_vec_cpu.fill(func);
     auto end_cpu = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_cpu = end_cpu - start_cpu;
     

@@ -2,8 +2,9 @@ PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 OBJS = Leopard.o
 CXX=icpx -fsycl
-CXXFLAGS = -O3
+CXXFLAGS = -Ofast -fsycl-early-optimizations #-fsanitize=address -fsanitize=undefined
 INCLUDES_DEP = vector_cpu.hpp vector_gpu.hpp
+LDFLAGS= $(CXXFLAGS)
 # ifeq ($(BUILD_MODE),debug)
 # 	CFLAGS += -g -O0
 # else ifeq ($(BUILD_MODE),run)

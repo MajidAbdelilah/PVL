@@ -3,7 +3,8 @@
         "ostream": "cpp",
         "chrono": "cpp",
         "ranges": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "type_traits": "cpp"
     },
     "C_Cpp.default.cppStandard": "c++17",
     "C_Cpp.default.includePath": [
