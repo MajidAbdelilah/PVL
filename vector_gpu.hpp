@@ -104,12 +104,11 @@ public:
         return *this;
     }
 
-    void fill(T value) {
+    void fill(const T value) {
         if (this->empty()) return;
         
         // Create SYCL buffer from the vector data
         sycl::buffer<T, 1> buf(this->data(), sycl::range<1>(this->size()));
-        
         // Submit a command group to the queue
         q.submit([&](sycl::handler& h) {
             // Get access to the buffer
@@ -153,25 +152,8 @@ public:
         q.wait();
     }
 
-    // Keep the existing fill method with std::function for CPU fallback
-    void fill(std::function<T(T, size_t)> func) {
-        if (this->empty()) return;
-        
-        // For CPU fallback, we can just loop through elements
-        if (!is_gpu) {
-            for (size_t i = 0; i < this->size(); i++) {
-                (*this)[i] = func((*this)[i], i);
-            }
-            return;
-        }
-        
-        // Otherwise, we use a default SyclFunction and warn the user
-        std::cerr << "Warning: std::function is not fully SYCL compatible. Using default implementation." << std::endl;
-        SyclFunction<T> sycl_func;
-        fill(sycl_func);
-    }
-
-    void fill(std::function<T(T&, size_t)> func, size_t size) {
+    
+    void fill(const SyclFunction<T>& func, size_t size) {
         this->resize(size);
         fill(func);
     }

@@ -172,7 +172,8 @@ void test_gpu_vector() {
     
     // Test performance comparison with CPU version
     std::cout << "\nPerformance comparison (GPU vs CPU)..." << std::endl;
-    const size_t size = 10000000;
+    const size_t size = 1000000000; // 1 billion elements
+    std::cout << "Filling vector with " << size << " elements..." << std::endl;
     
     // GPU Version
     Lp_parallel_vector_GPU<int> large_vec_gpu(size);

@@ -1,8 +1,9 @@
 PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 OBJS = Leopard.o
-CXX=icpx
-CXXFLAGS = -fsycl
+CXX=icpx -fsycl
+CXXFLAGS = -O3
+INCLUDES_DEP = vector_cpu.hpp vector_gpu.hpp
 # ifeq ($(BUILD_MODE),debug)
 # 	CFLAGS += -g -O0
 # else ifeq ($(BUILD_MODE),run)
@@ -18,11 +19,11 @@ CXXFLAGS = -fsycl
 
 all:	Leopard
 
-Leopard:	$(OBJS)
-	$(CXX) $(LDFLAGS) -o $@ $^
+Leopard:	$(OBJS) 
+	$(CXX) $(LDFLAGS) -o $@ $(OBJS)
 	$(EXTRA_CMDS)
 
-%.o:	$(PROJECT_ROOT)%.cpp
+%.o:	$(PROJECT_ROOT)%.cpp $(INCLUDES_DEP)
 	$(CXX) -c $(CFLAGS) $(CXXFLAGS) $(CPPFLAGS) -o $@ $<
 
 %.o:	$(PROJECT_ROOT)%.c
