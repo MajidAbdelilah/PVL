@@ -250,24 +250,24 @@ void test_gpu_vector() {
     
     // Test performance comparison with CPU version
     std::cout << "\nPerformance comparison (GPU vs CPU)..." << std::endl;
-    const size_t size = 1000000000; // 1 billion elements
+    const size_t size = 100000000; // 0.1 billion elements
     std::cout << "Filling vector with " << size << " elements..." << std::endl;
     
     // GPU Version
-    Lp_parallel_vector_GPU<int> large_vec_gpu(size);
+    Lp_parallel_vector_GPU<vec2> large_vec_gpu(size);
     auto start_gpu = std::chrono::high_resolution_clock::now();
     DoubleFunc doubleFunc2;
-    large_vec_gpu.fill(doubleFunc2);
+    large_vec_gpu.fill(DoubleFunction());
     auto end_gpu = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_gpu = end_gpu - start_gpu;
-    
+    large_vec_gpu.clear();
     // CPU Version
-    Lp_parallel_vector<int> large_vec_cpu(size);
+    Lp_parallel_vector<vec2> large_vec_cpu(size);
     auto start_cpu = std::chrono::high_resolution_clock::now();
-    large_vec_cpu.fill(func);
+    large_vec_cpu.fill(DoubleFunction());
     auto end_cpu = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_cpu = end_cpu - start_cpu;
-    
+    large_vec_cpu.clear();
     std::cout << "GPU time: " << elapsed_gpu.count() << " seconds" << std::endl;
     std::cout << "CPU time: " << elapsed_cpu.count() << " seconds" << std::endl;
     

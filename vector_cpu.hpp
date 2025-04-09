@@ -772,3 +772,178 @@ private:
     size_t num_thread;
     std::thread threads[128];
 };
+
+
+template<typename T, class Func>
+static void Lp_if_parallel(Lp_parallel_vector<T> &vec, Func func)
+{
+    std::thread threads[128];
+    for(size_t i = 0; i < std::thread::hardware_concurrency(); i++)
+    {
+        threads[i] = std::thread([&vec, i, &func]() {
+            for(size_t j = i; j < vec.size(); j+= std::thread::hardware_concurrency())
+                if(static_cast<bool>(vec[j]))
+                    func(static_cast<bool>(vec[j]), j);
+        });
+    }
+    for(size_t i = 0; i < std::thread::hardware_concurrency(); i++) {
+        if(threads[i].joinable()) {
+            threads[i].join();
+        }
+    }
+}
+
+template<typename T, class Func>
+static void Lp_if_single_threaded(Lp_parallel_vector<T>& vec, Func func)
+{
+    for(size_t j = 0; j < vec.size(); j++)
+        if(static_cast<bool>(vec[j]))
+            func(static_cast<bool>(vec[j]), j);
+}
+
+// Parallel quicksort implementation using a thread pool
+template<typename T, typename Func>
+void Lp_sort(Lp_parallel_vector<T>& vec, Func comp)
+{
+    // Check if the vector is empty or has only one element
+    if (vec.size() <= 1) {
+        return; // Already sorted
+    }
+    
+    // Create a copy of the vector data to work with
+    std::vector<T> arr(vec.begin(), vec.end());
+    
+    // Get number of hardware threads
+    size_t num_threads = std::thread::hardware_concurrency();
+    
+    // Create a thread pool
+    std::vector<std::thread> thread_pool;
+    
+    // Create a mutex for thread synchronization
+    std::mutex mutex;
+    
+    // Create a queue of tasks (ranges to sort)
+    std::vector<std::pair<size_t, size_t>> task_queue;
+    task_queue.push_back({0, arr.size() - 1});
+    
+    // Create an atomic counter for active tasks
+    std::atomic<size_t> active_tasks(1);
+    
+    // Create a condition variable for synchronization
+    std::condition_variable cv;
+    
+    // Function to process tasks from the queue
+    auto process_tasks = [&]() {
+        while (true) {
+            // Get a task from the queue
+            std::pair<size_t, size_t> task;
+            {
+                std::unique_lock<std::mutex> lock(mutex);
+                
+                // Wait until there's a task or all tasks are done
+                cv.wait(lock, [&]() {
+                    return !task_queue.empty() || active_tasks.load() == 0;
+                });
+                
+                // If all tasks are done, exit
+                if (task_queue.empty() && active_tasks.load() == 0) {
+                    break;
+                }
+                
+                // Get a task from the queue
+                if (!task_queue.empty()) {
+                    task = task_queue.back();
+                    task_queue.pop_back();
+                } else {
+                    continue;
+                }
+            }
+            
+            // Process the task
+            size_t low = task.first;
+            size_t high = task.second;
+            
+            // If the range is small, use sequential sort
+            if (high - low < 1000) {
+                std::sort(arr.begin() + low, arr.begin() + high + 1, comp);
+                active_tasks--;
+                cv.notify_all();
+                continue;
+            }
+            
+            // Partition the array
+            size_t pivot_idx;
+            
+            // Simple partitioning
+            {
+                // Choose pivot (middle element)
+                T pivot = arr[low + (high - low) / 2];
+                
+                // Initialize indices
+                size_t i = low;
+                size_t j = high;
+                
+                // Partition the array
+                while (true) {
+                    // Find element on left that should be on right
+                    while (i < arr.size() && comp(arr[i], pivot)) i++;
+                    
+                    // Find element on right that should be on left
+                    while (j > 0 && comp(pivot, arr[j])) j--;
+                    
+                    // If indices crossed, break
+                    if (i >= j) {
+                        pivot_idx = j;
+                        break;
+                    }
+                    
+                    // Swap elements
+                    std::swap(arr[i], arr[j]);
+                    i++;
+                    j--;
+                }
+            }
+            
+            // Add new tasks to the queue
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                
+                // Add left sub-array to the queue
+                if (pivot_idx > 0 && low < pivot_idx) {
+                    task_queue.push_back({low, pivot_idx});
+                    active_tasks++;
+                }
+                
+                // Add right sub-array to the queue
+                if (pivot_idx < high) {
+                    task_queue.push_back({pivot_idx + 1, high});
+                    active_tasks++;
+                }
+            }
+            
+            // Decrement active tasks counter
+            active_tasks--;
+            
+            // Notify waiting threads
+            cv.notify_all();
+        }
+    };
+    
+    // Start worker threads
+    for (size_t i = 0; i < num_threads; i++) {
+        thread_pool.push_back(std::thread(process_tasks));
+    }
+    
+    // Wait for all threads to finish
+    for (auto& thread : thread_pool) {
+        if (thread.joinable()) {
+            thread.join();
+        }
+    }
+    
+    // Copy the sorted data back to the original vector
+    for (size_t i = 0; i < vec.size(); i++) {
+        vec[i] = arr[i];
+    }
+}
+
